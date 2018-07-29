@@ -109,6 +109,9 @@ public:
            isSending{false},
            
            endSendMillis(0),
+           // the default value for transferDelay is 9ms; I have found this value via trial-and-error
+           // the necessity for for this delay is indicated in https://statics3.seeedstudio.com/assets/file/bazaar/product/HC-12_english_datasheets.pdf
+           // the optimal value for transferDelay may be different across different HC12 modules
            transferDelay(transferDelay),
            
            // allocate messageLen chars + 1 for \0
@@ -122,7 +125,8 @@ public:
            
            baudRate{baudRate},
            setPin{setPin},
-           // times in milliseconds; taken from v2 documentation
+           // times in milliseconds; taken from v2.4 documentation
+           // https://statics3.seeedstudio.com/assets/file/bazaar/product/HC-12_english_datasheets.pdf
            setLowTime{50},
            setHighTime{90},
            cmdTime{100},

@@ -43,7 +43,7 @@ boolean simpleHC12::cmd(const char cmd[], boolean printSerial) {
     char input;
     
     while (iHC12.available() && i<cmdResBuffLen-1) {
-		input = iHC12.read();
+        input = iHC12.read();
         // no interrupts allowed while writing to buffer
         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
             cmdResBuff[i] = input;
@@ -121,7 +121,7 @@ void simpleHC12::printCore(boolean printSerial) {
             snprintf(checksumBuffer,checksumLen,"%5u",checksum);
         }
         
-        // send delimited between data and checksum
+        // send delimiter between data and checksum
         iHC12.print(checksumDelim);
         
         // send checksum buffer to HC12 module
@@ -149,12 +149,12 @@ void simpleHC12::printCore(boolean printSerial) {
     endSendMillis=millis();
 }
 
-//print for char arrays
+// HC12 print method for char arrays
 void simpleHC12::print(char data[], boolean printSerial) {
     // clear sendData buffer
     clearBuffer(sendData,messageLen);
     
-    // arduino's snprintf does not allow to use printf's asterisk notation for setting fixed widths with variables
+    // arduino's snprintf does not allow to use printf's asterisk notation for setting fixed widths
     // therefore, we prepare our own format string
     char formatBuffer[6];
     snprintf(formatBuffer,6,"%%%ds",messageLen-1);
@@ -165,13 +165,13 @@ void simpleHC12::print(char data[], boolean printSerial) {
     printCore(printSerial);
 }
 
-//print for integers
+// HC12 print method for integers
 void simpleHC12::print(int data, boolean printSerial) {
     // clear sendData buffer
     clearBuffer(sendData,messageLen);
     
-    //snprintf does not allow to use printf's asterisk notation for setting fixed widths with variables
-    //therefore, we prepare our own format string
+    // arduino's snprintf does not allow to use printf's asterisk notation for setting fixed widths
+    // therefore, we prepare our own format string
     char formatBuffer[6];
     snprintf(formatBuffer,6,"%%%dd",messageLen-1);
     
@@ -181,16 +181,17 @@ void simpleHC12::print(int data, boolean printSerial) {
     printCore(printSerial);
 }
 
+// read data from HC12 module
 void simpleHC12::read() {
-	size_t i = 0;
-	char input;
+    size_t i = 0;
+    char input;
     
     // clear buffer for received data
     clearBuffer(rcvData,messageLen);
     
-	while (iHC12.available()) {
+    while (iHC12.available()) {
         // call to SoftwareSerial's read function
-		input = iHC12.read();
+        input = iHC12.read();
         
         // no interrupts while we store the read data in the rcvData buffer
         // ATOMIC_BLOCK very important here

@@ -1,3 +1,11 @@
+/* 
+ * HC12 transmitter code for the simpleHC12 library
+ * Works together with the receiver code in simpleHC12Receiver.ino
+ * 
+ * Increases an integer counter and transmits the counter value to another HC12 module (receiver)
+ * Uses the checksum functionality of the simpleHC12 library
+ * Also prints some transmission statistics
+ */
 #include "simpleHC12.h"
 #include <SoftwareSerial.h>
 

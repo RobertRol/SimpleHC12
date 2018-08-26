@@ -1,3 +1,11 @@
+/*
+ * HC12 receiver code for the simpleHC12 library
+ * Works together with the transmitter code of simpleHC12Sender.ino
+ * 
+ * Receives and prints an integer value as sent from another HC12 sender
+ * Also prints some transmission statistics
+ */
+
 #include "simpleHC12.h"
 #include <SoftwareSerial.h>
 
@@ -78,7 +86,7 @@ void loop() {
   // process data as soon as HC12 has finished reading
   if (HC12.hasFinishedReading()) {
     // does the received checksum value match the one calculated from the received data?
-    // checksumOk() will alwasy return true if useChecksum is set to false
+    // checksumOk() will always return true if useChecksum is set to false
     if (HC12.checksumOk()) {
       // checksum is ok --> increase okCounter
       okCounter++;
@@ -91,7 +99,7 @@ void loop() {
       errCounter++;
     }
     // reset flag
-    HC12.setReadyToRead();
+    HC12.resetFinishedReading();
   }
 }
 

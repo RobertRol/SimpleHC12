@@ -13,7 +13,7 @@ An Arduino library for reliable data transfer between HC12 RF modules. It provid
 Copy `simpleHC12.cpp` and `simpleHC12.h` into a new folder `simpleHC12` in your libraries directory. In my case, the files are located in `/home/robert/sketchbook/libraries/simpleHC12`.
 
 Then include the line
-```
+```cpp
 #include "simpleHC12.h"
 ```
 in your project.
@@ -27,13 +27,13 @@ and [simpleHC12Receiver.ino](https://github.com/RobertRol/SimpleHC12/blob/master
 for an example on how to set up a simple communication between two HC12 modules.
 
 Since the `simpleHC12` library prints information to the serial port, the user has to add
-```
+```cpp
 Serial.begin(115200); //or any other baudrate
 ```
 to the `setup` routine.
 
 The basic **transmitter** code looks like
-```
+```cpp
 #include "simpleHC12.h"
 #include <SoftwareSerial.h>
 
@@ -65,7 +65,7 @@ void loop() {
 ```
 
 **Receiver** code
-```
+```cpp
 // same as transmitter code up to loop function
 
 // holds received data; messageLength + \0
@@ -111,7 +111,7 @@ Using simple checksums to ensure data integrity does not capture all transmissio
 ## Public Methods Description
 
 ### The Constructor
-```
+```cpp
 // simpleHC12 constructor
 simpleHC12 (const unsigned int txPin,
             const unsigned int rxPin,
@@ -134,19 +134,19 @@ simpleHC12 (const unsigned int txPin,
 * `checksumDelim` if the user decides to use the checksum functionality, the checksum integer will be appended to the original message and delimited by this character
 
 ### safeSetBaudRate
-```
+```cpp
 void safeSetBaudRate();
 ```
 Convenience function to set baudrate (as given in constructor). Also works if the user does not know the _current_ HC12 baudrate setting.
 
 
 ### Changing the HC12 module configuration
-```
+```cpp
 boolean cmd(const char[], boolean printSerial=false);
 ```
 
 Let's say the user wants to change to high power transmission mode, then he would execute
-```
+```cpp
 HC12.cmd("AT+P8"); // with HC12 being the simpleHC12 object
 ```
 Setting `printSerial` to `true` will print the response of the HC12 module to the serial port.
@@ -155,7 +155,7 @@ A list of configuration options for the HC12 module is given in https://statics3
 
 
 ### Print routine
-```
+```cpp
 // print routine for char arrays
 void print(char[], boolean printSerial=false);
 // print routine for ints
@@ -167,24 +167,24 @@ Setting `printSerial` to `true` will also print the transmitted message to the s
 
 
 ### Reading data
-```
+```cpp
 void read();
 ```
 Reads RF data and writes it to the `rcvData` buffer. The user cannot directly access this buffer but has to use the following accessor routine instead
 
-```
+```cpp
 char* getRcvData();
 ```
 
 The data can then be copied into a user-specified array like that
-```
+```cpp
 // +1 for \0 termination
 char data[messageLength + 1];
 strncpy(data, HC12.getRcvData(), messageLength); // with HC12 being the simpleHC12 object
 ```
 
 ### Checksum
-```
+```cpp
 boolean checksumOk();
 ```
 
@@ -192,20 +192,20 @@ Compares the received checksum value to the one calculated from the received dat
 `checksumOk` will always return `true` if `useChecksum` is set to `false`.
 
 ### isReadyToSend
-```
+```cpp
 boolean isReadyToSend();
 ```
 Indicates when the HC12 module is ready to send a new data package.
 
 
 ### hasFinishedReading
-```
+```cpp
 boolean hasFinishedReading();
 ```
 Indicates when the HC12 module has finished reading a data package.
 
 ### resetFinishedReading
-```
+```cpp
 void resetFinishedReading();
 ```
 
@@ -213,14 +213,14 @@ Resets the `finishedReading` flag to `false`. Must be used after data is read an
 
 
 ### Detect baudrate
-```
+```cpp
 void baudDetector();
 ```
 Detects baudrate setting of the HC12 module and prints it to the serial port.
 
 
 ### begin and end routines
-```
+```cpp
 void begin();
 void end();
 ```
@@ -229,7 +229,7 @@ Not needed if user calls `safeSetBaudRate()`.
 
 
 ### Reset module to defaults
-```
+```cpp
 void bruteSetDefault();
 ```
 Sets HC12 module to default state across all baudrates. Therefore also works if user does not know the current HC12 baudrate setting.

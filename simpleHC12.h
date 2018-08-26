@@ -108,11 +108,11 @@ public:
            finishedSending{false},
            isSending{false},
            
-           endSendMillis(0),
+           endSendMillis{0},
            // the default value for transferDelay is 9ms; I have found this value via trial-and-error
            // the necessity for for this delay is indicated in https://statics3.seeedstudio.com/assets/file/bazaar/product/HC-12_english_datasheets.pdf
            // the optimal value for transferDelay may be different across different HC12 modules
-           transferDelay(transferDelay),
+           transferDelay{transferDelay},
            
            // allocate messageLen chars + 1 for \0
            messageLen{messageLen+1},
@@ -166,10 +166,7 @@ public:
     // wrappers around SoftwareSerial's begin and end methods
     void begin();
     void end();
-    
-    // clears buffer
-    void clearBuffer(char*, const size_t);
-    
+        
     // sends cmd to HC12 module
     boolean cmd(const char[], boolean printSerial=false);
     
@@ -190,11 +187,8 @@ public:
     // module has finished reading data
     boolean hasFinishedReading();
     
-    // marks that data can be read from the module
-    void setReadyToRead();
-    
-    // send cmds across all baudrates given in baudArray
-    loopCmdRes loopCmd(char cmdChar[]);
+    // sets finishedReading flag back to false
+    void resetFinishedReading();
     
     // detects baudrate setting of the HC12 module
     void baudDetector();
@@ -204,6 +198,15 @@ public:
     
     // convenience function to set baudRate
     void safeSetBaudRate();
+private:
+    // clears buffer
+    void clearBuffer(char*, const size_t);
+    
+    // send cmds across all baudrates given in baudArray
+    loopCmdRes loopCmd(char cmdChar[]);
+    
+    // prints buffer overflow message
+    void bufferOverflowMsg();
 };
  
 #endif

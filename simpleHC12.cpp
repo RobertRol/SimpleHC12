@@ -3,6 +3,7 @@
 #include <util/atomic.h>
 
 // array of all valid baudrates
+// note that I was not able to use any baudrate above 19200
 const long simpleHC12::baudArray[] = {1200,2400,4800,9600,19200,38400,57600,115200};
 
 // wrapper around SoftwareSerial's begin function
@@ -256,7 +257,7 @@ boolean simpleHC12::checksumOk() {
 }
 
 // marks that data can be read from the module
-void simpleHC12::setReadyToRead() {
+void simpleHC12::resetFinishedReading() {
     finishedReading=false;
 }
 
@@ -296,6 +297,13 @@ loopCmdRes simpleHC12::loopCmd(char cmdChar[]) {
     return loopCmdRes(doStop,bufferOK, i);
 }
 
+// prints buffer overflow message
+void simpleHC12::bufferOverflowMsg() {
+    Serial.println("- Buffer overflow in baudDetector                     -");
+    Serial.println("- This might be due to an interferring sending module -");
+    Serial.println("- Turn it off and try again                           -");
+}
+
 // detects baudrate setting of the HC12 module
 void simpleHC12::baudDetector() {
     Serial.println("***Detecting baudRate***");
@@ -306,9 +314,7 @@ void simpleHC12::baudDetector() {
     
     // buffer overflow
     if (!tmp.bufferOK) {
-        Serial.println("- Buffer overflow in baudDetector                     -");
-        Serial.println("- This might be due to an interferring sending module -");
-        Serial.println("- Turn off and try again                              -");
+        bufferOverflowMsg();
     } else {
         if (tmp.doStop) {
             Serial.print("Detected baudRate at: ");
@@ -347,7 +353,6 @@ void simpleHC12::bruteSetDefault() {
 // also works if the user does not know the current HC12 baudrate setting
 void simpleHC12::safeSetBaudRate() {
     Serial.println("***Safe-setting baudRate***");
-    char baudChar[11];
     char baudCharSet[11];
     
     sprintf(baudCharSet,"AT+B%ld",baudRate);
@@ -355,14 +360,12 @@ void simpleHC12::safeSetBaudRate() {
     loopCmdRes tmp=loopCmd(baudCharSet);
     
     if (!tmp.bufferOK) {
-        Serial.println("- Buffer overflow in safeSetBaudRate                  -");
-        Serial.println("- This might be due to an interferring sending module -");
-        Serial.println("- Turn off and try again                              -");
+        bufferOverflowMsg();
     } else {
         if (tmp.doStop) {
             Serial.println(cmdResBuff);
         } else {
-            Serial.println("Could not set baudRate");
+            baudDetector();
         }
     }
 }

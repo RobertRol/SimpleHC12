@@ -22,8 +22,8 @@ You must have the `SoftwareSerial` library installed in order to be able to use 
 
 ## Usage
 
-See files [simpleHC12Sender.ino](https://github.com/RobertRol/SimpleHC12/blob/master/simpleHC12Sender.ino)
-and [simpleHC12Receiver.ino](https://github.com/RobertRol/SimpleHC12/blob/master/simpleHC12Receiver.ino)
+See files [simpleHC12Sender.ino](https://github.com/RobertRol/SimpleHC12/blob/master/examples/simpleHC12Sender/simpleHC12Sender.ino)
+and [simpleHC12Receiver.ino](https://github.com/RobertRol/SimpleHC12/blob/master/examples/simpleHC12Receiver/simpleHC12Receiver.ino)
 for an example on how to set up a simple communication between two HC12 modules.
 
 Since the `simpleHC12` library prints information to the serial port, the user has to add

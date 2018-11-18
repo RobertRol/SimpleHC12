@@ -32,19 +32,27 @@ private:
     boolean isReadingData;
     // module is reading checksum (if present)
     boolean isReadingChecksum;
-    // module finished reading message
-    boolean finishedReading;
     // module finihsed sending message
     boolean finishedSending;
     // module currently sending message
     boolean isSending;
+    // module is ready to receive
+    boolean readyToReceive;
+    // module has finished reading
+    boolean finishedReading;
+    
+    // iterator variables for message and checksum
+    size_t messageIter;
+    size_t checksumIter;
     
     // time counter that is updated after a message was sent
     unsigned long endSendMillis;
     // minumum time between sending messages
-    const unsigned int transferDelay;
+    unsigned int transferDelay;
     
-    // buffer for data to be sent
+    // buffer for message
+    char* message;
+    // buffer for data to be sent (including start/endChar, checksum and delimiter)
     char* sendData;
     // buffer for received data
     char* rcvData;
@@ -52,11 +60,20 @@ private:
     char* checksumBuffer;
     // buffer for response of cmds
     char* cmdResBuff;
+    char* allData;
     // holds all valid baudRates
     static const long baudArray[];
     
+    // arduino's snprintf does not allow to use printf's asterisk notation for setting fixed widths
+    // therefore, we prepare our own format string
+    char stringFormatBuffer[6];
+    char intFormatBuffer[6];
+    char uintFormatBuffer[6];
+    
     // length of message
     const size_t messageLen;
+    // length of data to be sent
+    const size_t sendDataLen;
     // length of checksum
     const size_t checksumLen;
     // length of cmdResBuff
@@ -89,7 +106,7 @@ public:
             const unsigned long baudRate,
             const size_t messageLen,
             const boolean useChecksum=false,
-            const unsigned int transferDelay=9,
+            const unsigned int transferDelay=0,
             char startChar='<',
             char endChar='>',
             char checksumDelim=','
@@ -98,26 +115,35 @@ public:
            endChar{endChar},
            checksumDelim{checksumDelim},
            
+           // iterator for received message buffer
+           messageIter{0},
+           // iterator for received checksum
+           checksumIter{0},
+           
            checksum{0},
            useChecksum{useChecksum},
            
            isStarted{false},
            isReadingData{false},
            isReadingChecksum{false},
-           finishedReading{false},
            finishedSending{false},
            isSending{false},
+           readyToReceive{true},
+           finishedReading{false},
            
            endSendMillis{0},
-           // the default value for transferDelay is 9ms; I have found this value via trial-and-error
-           // the necessity for for this delay is indicated in https://statics3.seeedstudio.com/assets/file/bazaar/product/HC-12_english_datasheets.pdf
-           // the optimal value for transferDelay may be different across different HC12 modules
+           // the documentation is hard to read due to the bad English but ...
+           // ... a delay between sending packages might be necessary for some transmission modes
+           // it's 0 by default
            transferDelay{transferDelay},
            
+           // allocate messageLen chars + 2 for start/endChar + 5 chars for checksum (if selected) + 1 for checksum delimiter + 1 for \0
+           sendDataLen{messageLen + 2 + (useChecksum ? 6 : 0) + 1},
            // allocate messageLen chars + 1 for \0
-           messageLen{messageLen+1},
+           messageLen{messageLen + 1 },
            // checksum is a uint value; its max value is therefore 2**16-1=65535, which can be represented by a 5 digit integer
            // note: add one char for \0 --> 6 chars in total
+           // this also means that the maximal message length is 255 when using the checksum functionality
            checksumLen{useChecksum ? 6 : 0},
            // 20 chars should be enough for most HC12 cmds; might not work for "AT+RX"
            cmdResBuffLen{20},
@@ -137,10 +163,13 @@ public:
                
                // setPin must be set to output
                pinMode(setPin, OUTPUT);
-               
+                              
                // allocate arrays and clear data
-               sendData=new char[messageLen];
-               clearBuffer(sendData,messageLen);
+               sendData=new char[sendDataLen];
+               clearBuffer(sendData,sendDataLen);
+               
+               message=new char[messageLen];
+               clearBuffer(message,messageLen);
                
                if (useChecksum) {
                    checksumBuffer=new char[checksumLen];
@@ -151,6 +180,10 @@ public:
                
                cmdResBuff=new char[cmdResBuffLen];
                clearBuffer(cmdResBuff,cmdResBuffLen);
+               
+               snprintf(stringFormatBuffer,6,"%%%ds",messageLen);
+               snprintf(intFormatBuffer,6,"%%%dd",messageLen);
+               snprintf(uintFormatBuffer,6,"%%%du",messageLen);
     };
         
     //destructor
@@ -158,6 +191,7 @@ public:
         if (isStarted) iHC12.end();
         isStarted=false;
         if (useChecksum) delete[] checksumBuffer;
+        delete[] message;
         delete[] sendData;
         delete[] rcvData;
         delete[] cmdResBuff;
@@ -174,6 +208,8 @@ public:
     void print(char[], boolean printSerial=false);
     // print routine for ints
     void print(int, boolean printSerial=false);
+    // print routine for uints
+    void print(unsigned int, boolean printSerial=false);
     
     // reads data from HC12 module
     void read();
@@ -182,13 +218,13 @@ public:
     
     // checks whether checksum of message is OK
     boolean checksumOk();
-    // module can send data
+    // module is ready to send data
     boolean isReadyToSend();
-    // module has finished reading data
-    boolean hasFinishedReading();
+    // has module finished receiving data
+    boolean dataIsReady();
     
-    // sets finishedReading flag back to false
-    void resetFinishedReading();
+    void setReadyToReceive();
+    void setNotReadyToReceive();
     
     // detects baudrate setting of the HC12 module
     void baudDetector();
@@ -198,6 +234,9 @@ public:
     
     // convenience function to set baudRate
     void safeSetBaudRate();
+    
+    // change transferDelay on-the-fly
+    void setTransferDelay(unsigned int newTransferDelay);
 private:
     // clears buffer
     void clearBuffer(char*, const size_t);

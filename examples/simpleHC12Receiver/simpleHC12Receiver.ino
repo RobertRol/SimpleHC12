@@ -6,7 +6,7 @@
  * Also prints some transmission statistics
  */
 
-#include "simpleHC12.h"
+#include <simpleHC12.h>
 #include <SoftwareSerial.h>
 
 // Arduino pins to which the HC12 module's read/transmit/set pins are connected
@@ -16,9 +16,7 @@ const unsigned int hc12SetPin = 2;
 
 // variables for HC12 module setup
 const unsigned long baudRate = 19200;
-// the transmitted value is an unsigned integer; its max value is therefore 2**16-1=65535, which can be represented by a 5 digit/char integer
-// therefore, set messageLength to 5
-const unsigned messageLength = 5;
+const unsigned messageLength = 16;
 boolean useChecksum = true;
 
 // create simpleHC12 object
@@ -32,9 +30,10 @@ char data[messageLength + 1];
 unsigned long okCounter = 0;
 unsigned long errCounter = 0;
 unsigned long ttlCounter = 0;
-unsigned long estBaudRate = 0;
+double estBaudRate = 0;
 double okRatio = 0;
 unsigned long tStart = millis();
+unsigned long deltaTime = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -51,11 +50,20 @@ void setup() {
 }
 
 void loop() {
-  // print stats every 100 milliseconds
-  if (millis()-tStart >= 1000) {
+  // print stats every 1000 milliseconds
+  // for some reason this does not really print statistics every 1000ms but less frequently
+  // estBaudRate is also affected
+  deltaTime = millis()-tStart;
+  if (deltaTime >= 1000) {    
     // sum of OK and error data
     ttlCounter = okCounter + errCounter;
     okRatio = (double)okCounter / (double)ttlCounter;
+        
+    // number of packages sent x 
+    //    10 bits per char (8 bits for char + start/stop bit) x
+    //    [ message length including start/end delimiters + 
+    //      checksum + delimiter (if selected)]
+    estBaudRate = (double)(ttlCounter * 10 * (messageLength + 2 + (useChecksum ? 6 : 0)))/(1e-3 * (double)deltaTime);
     
     // print last received data
     Serial.print("Received data: ");
@@ -63,14 +71,18 @@ void loop() {
     
     Serial.print("OK ratio: ");
     Serial.println(okRatio, 2);
-        
-    // number of chars sent x 8 bits per char x message length including start/end delimiters, checksum+delimiter (if selected) and \0
-    estBaudRate = ttlCounter * 8 * (messageLength + 2 + (useChecksum ? 6 : 0) + 1);
+    
     Serial.print("Estimated baudrate: ");
-    Serial.println(estBaudRate);
+    Serial.println(estBaudRate, 0);
+    
+    Serial.print("DeltaT: ");
+    Serial.println(deltaTime);
     
     Serial.print("OK counter: ");
     Serial.println(okCounter);
+    
+    Serial.print("TTL counter: ");
+    Serial.println(ttlCounter);
     
     Serial.println("-----------");
     
@@ -84,22 +96,24 @@ void loop() {
   // read from HC12 module
   HC12.read();
   // process data as soon as HC12 has finished reading
-  if (HC12.hasFinishedReading()) {
+  if (HC12.dataIsReady()) {
+    // this is how received data should be copied from the simpleHC12 buffer into other arrays
+    // add \0 to the end of data
+    strncpy(data,HC12.getRcvData(),messageLength);
+    data[messageLength]='\0';
     // does the received checksum value match the one calculated from the received data?
     // checksumOk() will always return true if useChecksum is set to false
     if (HC12.checksumOk()) {
       // checksum is ok --> increase okCounter
       okCounter++;
-      // this is how received data should be copied from the simpleHC12 buffer into other arrays
-      strncpy(data,HC12.getRcvData(),messageLength);
-      // add \0 to the end of data
-      data[messageLength]='\0';
+      //Serial.println(data);
     } else {
       // checksum is not ok --> increase errCounter
       errCounter++;
+      //Serial.println("Err");
     }
     // reset flag
-    HC12.resetFinishedReading();
+    HC12.setReadyToReceive();
   }
 }
 

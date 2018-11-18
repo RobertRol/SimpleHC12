@@ -71,11 +71,11 @@ boolean simpleHC12::cmd(const char cmd[], boolean printSerial) {
 // clears buffers
 void simpleHC12::clearBuffer(char* buff, const size_t buffLen) {
     // do not allow interrupts while writing to the buffer
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    //ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         for (size_t i=0;i<buffLen-1;++i) buff[i]=' ';
         // always terminate buffers with \0
         buff[buffLen-1]='\0';
-    }
+    //}
 }
 
 // main function for writing
@@ -83,12 +83,9 @@ void simpleHC12::printCore(boolean printSerial) {
     // indicate HC12 module is sending data
     isSending=true;
     
+    clearBuffer(sendData,sendDataLen);
     // clear checksum buffer if user selected checksum mode
-    if (useChecksum) clearBuffer(checksumBuffer,checksumLen);
-    if (printSerial) Serial.print(startChar);
-    
-    // send char indicating start of message
-    iHC12.print(startChar);
+    if (useChecksum) clearBuffer(checksumBuffer,checksumLen);    
     
     // reset checksum var
     checksum=0;
@@ -99,21 +96,11 @@ void simpleHC12::printCore(boolean printSerial) {
         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
             // skip last char = \0
             for (size_t i=0;i<messageLen-1;++i) {
-                checksum = checksum + (unsigned int)(sendData[i]);
+                checksum = checksum + (unsigned int)(message[i]);
             }
         }
     }
-    
-    // send sendData buffer to HC12 module
-    // but skip last char, i.e., do not send \0
-    // no interrupts while sending -- not sure whether ATOMIC_BLOCK is necessary here
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        for (size_t i=0;i<messageLen-1;++i) {
-            if (printSerial) Serial.print(sendData[i]);
-            iHC12.print(sendData[i]);
-        }
-    }
-    
+        
     if (useChecksum) {
         checksum = ~checksum;
         checksum++;
@@ -121,27 +108,16 @@ void simpleHC12::printCore(boolean printSerial) {
         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
             snprintf(checksumBuffer,checksumLen,"%5u",checksum);
         }
-        
-        // send delimiter between data and checksum
-        iHC12.print(checksumDelim);
-        
-        // send checksum buffer to HC12 module
-        // but skip last char, i.e., do not send \0
-        // no interrupts while sending -- not sure whether ATOMIC_BLOCK is necessary here
-        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-            for (size_t j=0;j<checksumLen-1;++j) iHC12.print(checksumBuffer[j]);
-        }
-        
-        if (printSerial) {
-            Serial.print(checksumDelim);
-            Serial.print(checksumBuffer);
-        }
     }
     
-    // send char indicating end of message
-    iHC12.print(endChar);
+    if (useChecksum) {
+        snprintf(sendData,sendDataLen,"%c%s%c%s%c",startChar,message,checksumDelim,checksumBuffer,endChar);
+    } else {
+        snprintf(sendData,sendDataLen,"%c%s%c",startChar,message,endChar);
+    }
     
-    if (printSerial) Serial.println(endChar);
+    iHC12.print(sendData);    
+    if (printSerial) Serial.println(sendData);
 
     // update flags
     isSending=false;
@@ -152,16 +128,11 @@ void simpleHC12::printCore(boolean printSerial) {
 
 // HC12 print method for char arrays
 void simpleHC12::print(char data[], boolean printSerial) {
-    // clear sendData buffer
-    clearBuffer(sendData,messageLen);
-    
-    // arduino's snprintf does not allow to use printf's asterisk notation for setting fixed widths
-    // therefore, we prepare our own format string
-    char formatBuffer[6];
-    snprintf(formatBuffer,6,"%%%ds",messageLen-1);
+    // clear message buffer
+    clearBuffer(message,messageLen);
     
     // format input to have the correct length
-    snprintf(sendData,messageLen,formatBuffer,data);
+    snprintf(message,messageLen,stringFormatBuffer,data);
     // send data to HC12 module
     printCore(printSerial);
 }
@@ -169,76 +140,97 @@ void simpleHC12::print(char data[], boolean printSerial) {
 // HC12 print method for integers
 void simpleHC12::print(int data, boolean printSerial) {
     // clear sendData buffer
-    clearBuffer(sendData,messageLen);
-    
-    // arduino's snprintf does not allow to use printf's asterisk notation for setting fixed widths
-    // therefore, we prepare our own format string
-    char formatBuffer[6];
-    snprintf(formatBuffer,6,"%%%dd",messageLen-1);
+    clearBuffer(message,messageLen);
     
     // format input to have the correct length
-    snprintf(sendData,messageLen,formatBuffer,data);
+    snprintf(message,messageLen,intFormatBuffer,data);
+    // send data to HC12 module
+    printCore(printSerial);
+}
+
+// HC12 print method for unsigned integers
+void simpleHC12::print(unsigned int data, boolean printSerial) {
+    // clear sendData buffer
+    clearBuffer(message,messageLen);
+
+    // format input to have the correct length
+    snprintf(message,messageLen,uintFormatBuffer,data);
     // send data to HC12 module
     printCore(printSerial);
 }
 
 // read data from HC12 module
 void simpleHC12::read() {
-    size_t i = 0;
+    if (!readyToReceive) return;
+
     char input;
-    
-    // clear buffer for received data
-    clearBuffer(rcvData,messageLen);
-    
+        
     while (iHC12.available()) {
+        if (finishedReading) {
+            readyToReceive = false;
+            break;
+        }
         // call to SoftwareSerial's read function
         input = iHC12.read();
         
-        // no interrupts while we store the read data in the rcvData buffer
-        // ATOMIC_BLOCK very important here
-        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-            if (input == endChar) {
-                isReadingData = false;
-                isReadingChecksum = false;
-                finishedReading = true;
-                break;
+        if (input == endChar) {
+            messageIter=0;
+            checksumIter=0;
+            
+            isReadingData = false;
+            isReadingChecksum = false;
+            finishedReading = true;
+        }
+        else if (input == startChar) {
+            messageIter=0;
+            checksumIter=0;
+            
+            isReadingData = true;
+            isReadingChecksum = false;
+            finishedReading = false;
+        }
+        else if ((input == checksumDelim) & useChecksum) {
+            checksumIter=0;
+            
+            isReadingData = false;
+            isReadingChecksum = true;
+            finishedReading = false;
+        }
+        else if (isReadingData) {
+            rcvData[messageIter] = input;
+            if (messageIter < messageLen - 1) {
+                messageIter++;
             }
-            else if (input == startChar) {
-                i=0;
-                isReadingData = true;
-                isReadingChecksum = false;
-            }
-            else if (input == checksumDelim & useChecksum) {
-                i=0;
-                isReadingData = false;
-                isReadingChecksum = true;
-            }
-            else if (isReadingData) {           
-                rcvData[i] = input;
-                if (i < messageLen - 1) {
-                    i++;
-                }
-                else if (!useChecksum) {
+            else {
+                // message length exceeded
+                messageIter=0;
+                checksumIter=0;
+                
+                if (!useChecksum) {
+                    // force stop
                     isReadingData = false;
                     isReadingChecksum = false;
                     finishedReading = true;
-                    break;
-                }
-            }
-            else if (isReadingChecksum) {
-                checksumBuffer[i] = input;
-                if (i < checksumLen - 1) {
-                    i++;
-                }
-                else {
-                    isReadingData = false;
-                    isReadingChecksum = false;
-                    finishedReading = true;
-                    break;
+                } else {
+                    //nothing
                 }
             }
         }
-        
+        else if (isReadingChecksum) {
+            checksumBuffer[checksumIter] = input;
+            if (checksumIter < checksumLen - 1) {
+                checksumIter++;
+            }
+            else {
+                // checksum length exceeded
+                messageIter=0;
+                checksumIter=0;
+                
+                isReadingData = false;
+                isReadingChecksum = false;
+                finishedReading = true;
+            }
+        }
 	}
 }
 
@@ -249,20 +241,42 @@ char* simpleHC12::getRcvData() {
 
 // check whether checksum is OK
 boolean simpleHC12::checksumOk() {
+    unsigned int checksumRcvd=0;
+    unsigned int sum=1;
+    checksum = 0;
     if (!useChecksum) return true;
-    checksum=0;
-    for (size_t i=0;i<messageLen-1;++i) checksum = checksum + (unsigned int)(rcvData[i]);
-    unsigned checksumRcvd=atoi(checksumBuffer);
-    return checksumRcvd+checksum == 0;
-}
-
-// marks that data can be read from the module
-void simpleHC12::resetFinishedReading() {
-    finishedReading=false;
+    
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        checksumRcvd=atoi(checksumBuffer);
+        for (size_t i=0;i<messageLen-1;++i) checksum = checksum + (unsigned int)(rcvData[i]);
+        sum = checksumRcvd + checksum;
+    }
+    /*Serial.print("checksumBuffer: ");
+    Serial.println(checksumBuffer);
+    Serial.print("checksum: ");
+    Serial.println(checksum);
+    Serial.print("sum: ");
+    Serial.println(sum);*/
+    return (sum == 0);
 }
 
 // module has finished reading data
-boolean simpleHC12::hasFinishedReading() {
+void simpleHC12::setReadyToReceive() {
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        readyToReceive = true;
+        finishedReading = false;
+        clearBuffer(rcvData,messageLen);
+        clearBuffer(checksumBuffer,checksumLen);
+    }
+}
+
+void simpleHC12::setNotReadyToReceive() {
+    readyToReceive = false;
+    finishedReading = false;
+}
+
+// module ready to receive new data
+boolean simpleHC12::dataIsReady() {
     return finishedReading;
 }
 
@@ -368,4 +382,9 @@ void simpleHC12::safeSetBaudRate() {
             baudDetector();
         }
     }
+}
+
+// allow user to change transfer delay time on-the-fly
+void simpleHC12::setTransferDelay(unsigned int newTransferDelay) {
+    transferDelay=newTransferDelay;
 }
